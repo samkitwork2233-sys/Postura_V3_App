@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>POSTURA_V3 Dashboard</title>
+
+<style>
+
+body{
+font-family: Arial;
+background:#0f172a;
+color:white;
+text-align:center;
+padding:40px;
+}
+
+h1{
+font-size:40px;
+}
+
+.card{
+background:#1e293b;
+padding:25px;
+margin:20px auto;
+width:320px;
+border-radius:12px;
+box-shadow:0 10px 20px rgba(0,0,0,0.3);
+}
+
+.value{
+font-size:32px;
+margin:10px;
+}
+
+.good{
+color:#22c55e;
+}
+
+.bad{
+color:#ef4444;
+}
+
+button{
+padding:12px 25px;
+font-size:18px;
+border:none;
+border-radius:8px;
+background:#3b82f6;
+color:white;
+cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>POSTURA_V3</h1>
+
+<button onclick="connectDevice()">Connect Device</button>
+
+<div class="card">
+<h2>Device Status</h2>
+<div id="status">Disconnected</div>
+</div>
+
+<div class="card">
+<h2>Angle</h2>
+<div class="value" id="angle">0°</div>
+</div>
+
+<div class="card">
+<h2>Deviation</h2>
+<div class="value" id="deviation">0°</div>
+</div>
+
+<div class="card">
+<h2>Posture Status</h2>
+<div class="value" id="posture">Waiting...</div>
+</div>
+
+<script>
+
+let characteristic;
+
+async function connectDevice(){
+
+try{
+
+const device = await navigator.bluetooth.requestDevice({
+filters:[{name:'POSTURA_V3'}],
+optionalServices:['12345678-1234-1234-1234-1234567890ab']
+});
+
+document.getElementById("status").innerText="Connecting...";
+
+const server = await device.gatt.connect();
+
+const service = await server.getPrimaryService('12345678-1234-1234-1234-1234567890ab');
+
+characteristic = await service.getCharacteristic('abcd1234-5678-1234-5678-abcdef123456');
+
+await characteristic.startNotifications();
+
+characteristic.addEventListener('characteristicvaluechanged', handleData);
+
+document.getElementById("status").innerText="Connected";
+
+}
+catch(error){
+
+document.getElementById("status").innerText="Connection Failed";
+
+}
+
+}
+
+function handleData(event){
+
+let value = new TextDecoder().decode(event.target.value);
+
+let data = value.split(",");
+
+let angle = parseFloat(data[0]);
+let deviation = parseFloat(data[1]);
+
+document.getElementById("angle").innerText = angle.toFixed(2)+"°";
+document.getElementById("deviation").innerText = deviation.toFixed(2)+"°";
+
+if(deviation > 15){
+
+document.getElementById("posture").innerHTML="<span class='bad'>BAD POSTURE</span>";
+
+}
+else{
+
+document.getElementById("posture").innerHTML="<span class='good'>GOOD POSTURE</span>";
+
+}
+
+}
+
+</script>
+
+</body>
+</html>
