@@ -22,7 +22,7 @@ font-size:40px;
 background:#1e293b;
 padding:25px;
 margin:20px auto;
-width:320px;
+width:340px;
 border-radius:12px;
 box-shadow:0 10px 20px rgba(0,0,0,0.3);
 }
@@ -48,6 +48,10 @@ border-radius:8px;
 background:#3b82f6;
 color:white;
 cursor:pointer;
+}
+
+.slider{
+width:80%;
 }
 
 </style>
@@ -79,9 +83,32 @@ cursor:pointer;
 <div class="value" id="posture">Waiting...</div>
 </div>
 
+<div class="card">
+<h2>Threshold Angle</h2>
+
+<input type="range" min="5" max="30" value="15"
+class="slider" id="thresholdSlider">
+
+<p>Threshold: <span id="thresholdValue">15</span>°</p>
+
+</div>
+
 <script>
 
 let characteristic;
+let threshold = 15;
+
+const slider = document.getElementById("thresholdSlider");
+
+slider.oninput = function(){
+
+threshold = this.value;
+
+document.getElementById("thresholdValue").innerText = threshold;
+
+sendThreshold();
+
+}
 
 async function connectDevice(){
 
@@ -127,7 +154,7 @@ let deviation = parseFloat(data[1]);
 document.getElementById("angle").innerText = angle.toFixed(2)+"°";
 document.getElementById("deviation").innerText = deviation.toFixed(2)+"°";
 
-if(deviation > 15){
+if(deviation > threshold){
 
 document.getElementById("posture").innerHTML="<span class='bad'>BAD POSTURE</span>";
 
@@ -135,6 +162,18 @@ document.getElementById("posture").innerHTML="<span class='bad'>BAD POSTURE</spa
 else{
 
 document.getElementById("posture").innerHTML="<span class='good'>GOOD POSTURE</span>";
+
+}
+
+}
+
+function sendThreshold(){
+
+if(characteristic){
+
+let encoder = new TextEncoder();
+
+characteristic.writeValue(encoder.encode(threshold));
 
 }
 
