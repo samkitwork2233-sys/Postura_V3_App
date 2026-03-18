@@ -52,20 +52,17 @@ border-radius:10px;
 <h1>POSTURA_V3 Dashboard</h1>
 
 <div class="card">
-<h3>Device</h3>
 <button onclick="connectDevice()">Connect Device</button>
 <p>Status: <span id="status">Disconnected</span></p>
 </div>
 
 <div class="card">
-<h3>Posture Data</h3>
 Angle: <span id="angle">0</span>°<br>
 Deviation: <span id="deviation">0</span>°<br>
 Status: <span id="posture">Waiting...</span>
 </div>
 
 <div class="card">
-<h3>Threshold</h3>
 
 <input type="range" min="5" max="30" value="15"
 class="slider" id="thresholdSlider">
@@ -75,28 +72,23 @@ class="slider" id="thresholdSlider">
 </div>
 
 <div class="card">
-<h3>Session Timer</h3>
-<span id="timer">0</span> sec
+Session Time: <span id="timer">0</span> sec
 </div>
 
 <div class="card">
-<h3>Posture Statistics</h3>
 Good Time: <span id="goodTime">0</span> sec<br>
 Bad Time: <span id="badTime">0</span> sec
 </div>
 
 <div class="card">
-<h3>Daily Posture Score</h3>
-Score: <span id="score">0</span>/100
+Posture Score: <span id="score">0</span>/100
 </div>
 
 <div class="card">
-<h3>Alert Counter</h3>
-Bad Posture Alerts: <span id="alerts">0</span>
+Slouch Count: <span id="alerts">0</span>
 </div>
 
 <div class="card">
-<h3>Posture Graph</h3>
 <canvas id="graph"></canvas>
 </div>
 
@@ -108,6 +100,9 @@ let threshold = 15
 let goodTime = 0
 let badTime = 0
 let alerts = 0
+
+let isSlouching = false
+
 let startTime
 
 const slider=document.getElementById("thresholdSlider")
@@ -161,16 +156,23 @@ let deviation=parseFloat(data[1])
 document.getElementById("angle").innerText=angle.toFixed(2)
 document.getElementById("deviation").innerText=deviation.toFixed(2)
 
-if(deviation>threshold){
+if(deviation > threshold){
 
 document.getElementById("posture").innerHTML="<span class='bad'>BAD POSTURE</span>"
+
 badTime++
+
+if(!isSlouching){
 alerts++
+isSlouching = true
+}
 
 }else{
 
 document.getElementById("posture").innerHTML="<span class='good'>GOOD POSTURE</span>"
+
 goodTime++
+isSlouching = false
 
 }
 
