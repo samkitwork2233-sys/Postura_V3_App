@@ -4,54 +4,48 @@
 <meta charset="UTF-8">
 <title>POSTURA_V3 Dashboard</title>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 
 body{
-font-family: Arial;
+font-family:Arial;
 background:#0f172a;
 color:white;
 text-align:center;
-padding:40px;
-}
-
-h1{
-font-size:40px;
+padding:30px;
 }
 
 .card{
 background:#1e293b;
-padding:25px;
-margin:20px auto;
-width:340px;
+padding:20px;
+margin:15px auto;
+width:360px;
 border-radius:12px;
-box-shadow:0 10px 20px rgba(0,0,0,0.3);
 }
 
 .value{
-font-size:32px;
-margin:10px;
+font-size:26px;
 }
 
-.good{
-color:#22c55e;
-}
-
-.bad{
-color:#ef4444;
-}
+.good{color:#22c55e;}
+.bad{color:#ef4444;}
 
 button{
-padding:12px 25px;
-font-size:18px;
+padding:10px 18px;
 border:none;
 border-radius:8px;
 background:#3b82f6;
 color:white;
 cursor:pointer;
+margin:5px;
 }
 
-.slider{
-width:80%;
+.slider{width:80%;}
+
+canvas{
+background:white;
+border-radius:10px;
 }
 
 </style>
@@ -61,30 +55,21 @@ width:80%;
 
 <h1>POSTURA_V3</h1>
 
+<div class="card">
+<h3>Device</h3>
 <button onclick="connectDevice()">Connect Device</button>
-
-<div class="card">
-<h2>Device Status</h2>
-<div id="status">Disconnected</div>
+<p>Status: <span id="status">Disconnected</span></p>
 </div>
 
 <div class="card">
-<h2>Angle</h2>
-<div class="value" id="angle">0°</div>
+<h3>Posture Data</h3>
+Angle: <span id="angle">0</span>°<br>
+Deviation: <span id="deviation">0</span>°<br>
+Status: <span id="posture">Waiting...</span>
 </div>
 
 <div class="card">
-<h2>Deviation</h2>
-<div class="value" id="deviation">0°</div>
-</div>
-
-<div class="card">
-<h2>Posture Status</h2>
-<div class="value" id="posture">Waiting...</div>
-</div>
-
-<div class="card">
-<h2>Threshold Angle</h2>
+<h3>Threshold</h3>
 
 <input type="range" min="5" max="30" value="15"
 class="slider" id="thresholdSlider">
@@ -93,20 +78,60 @@ class="slider" id="thresholdSlider">
 
 </div>
 
+<div class="card">
+<h3>Session</h3>
+
+Timer: <span id="timer">0</span> sec<br>
+Good Time: <span id="goodTime">0</span> sec<br>
+Bad Time: <span id="badTime">0</span> sec
+
+</div>
+
+<div class="card">
+<h3>Daily Score</h3>
+
+Score: <span id="score">0</span>/100
+
+</div>
+
+<div class="card">
+<h3>Alerts</h3>
+
+Total Alerts: <span id="alerts">0</span>
+
+</div>
+
+<div class="card">
+<h3>Controls</h3>
+
+<button onclick="toggleVibration()">Toggle Vibration</button>
+<button onclick="calibrate()">Calibrate</button>
+
+</div>
+
+<div class="card">
+<h3>Posture Graph</h3>
+<canvas id="graph"></canvas>
+</div>
+
 <script>
 
-let characteristic;
-let threshold = 15;
+let characteristic
+let threshold=15
+let vibration=true
 
-const slider = document.getElementById("thresholdSlider");
+let goodTime=0
+let badTime=0
+let alerts=0
+let startTime
 
-slider.oninput = function(){
+const slider=document.getElementById("thresholdSlider")
 
-threshold = this.value;
+slider.oninput=function(){
 
-document.getElementById("thresholdValue").innerText = threshold;
-
-sendThreshold();
+threshold=this.value
+document.getElementById("thresholdValue").innerText=threshold
+sendThreshold()
 
 }
 
@@ -114,29 +139,35 @@ async function connectDevice(){
 
 try{
 
-const device = await navigator.bluetooth.requestDevice({
+const device=await navigator.bluetooth.requestDevice({
 filters:[{name:'POSTURA_V3'}],
 optionalServices:['12345678-1234-1234-1234-1234567890ab']
-});
+})
 
-document.getElementById("status").innerText="Connecting...";
+document.getElementById("status").innerText="Connecting"
 
-const server = await device.gatt.connect();
+const server=await device.gatt.connect()
 
-const service = await server.getPrimaryService('12345678-1234-1234-1234-1234567890ab');
+const service=await server.getPrimaryService(
+'12345678-1234-1234-1234-1234567890ab')
 
-characteristic = await service.getCharacteristic('abcd1234-5678-1234-5678-abcdef123456');
+characteristic=await service.getCharacteristic(
+'abcd1234-5678-1234-5678-abcdef123456')
 
-await characteristic.startNotifications();
+await characteristic.startNotifications()
 
-characteristic.addEventListener('characteristicvaluechanged', handleData);
+characteristic.addEventListener(
+'characteristicvaluechanged',
+handleData)
 
-document.getElementById("status").innerText="Connected";
+document.getElementById("status").innerText="Connected"
+
+startTimer()
 
 }
-catch(error){
+catch(e){
 
-document.getElementById("status").innerText="Connection Failed";
+document.getElementById("status").innerText="Connection Failed"
 
 }
 
@@ -144,24 +175,80 @@ document.getElementById("status").innerText="Connection Failed";
 
 function handleData(event){
 
-let value = new TextDecoder().decode(event.target.value);
+let value=new TextDecoder().decode(event.target.value)
 
-let data = value.split(",");
+let data=value.split(",")
 
-let angle = parseFloat(data[0]);
-let deviation = parseFloat(data[1]);
+let angle=parseFloat(data[0])
+let deviation=parseFloat(data[1])
 
-document.getElementById("angle").innerText = angle.toFixed(2)+"°";
-document.getElementById("deviation").innerText = deviation.toFixed(2)+"°";
+document.getElementById("angle").innerText=angle.toFixed(2)
+document.getElementById("deviation").innerText=deviation.toFixed(2)
 
-if(deviation > threshold){
+if(deviation>threshold){
 
-document.getElementById("posture").innerHTML="<span class='bad'>BAD POSTURE</span>";
+document.getElementById("posture").innerHTML="<span class='bad'>BAD</span>"
+badTime++
+alerts++
+
+}else{
+
+document.getElementById("posture").innerHTML="<span class='good'>GOOD</span>"
+goodTime++
 
 }
-else{
 
-document.getElementById("posture").innerHTML="<span class='good'>GOOD POSTURE</span>";
+document.getElementById("goodTime").innerText=goodTime
+document.getElementById("badTime").innerText=badTime
+document.getElementById("alerts").innerText=alerts
+
+calculateScore()
+
+updateGraph(deviation)
+
+}
+
+function calculateScore(){
+
+let total=goodTime+badTime
+
+if(total==0)return
+
+let score=Math.round((goodTime/total)*100)
+
+document.getElementById("score").innerText=score
+
+}
+
+function startTimer(){
+
+startTime=Date.now()
+
+setInterval(function(){
+
+let sec=Math.floor((Date.now()-startTime)/1000)
+
+document.getElementById("timer").innerText=sec
+
+},1000)
+
+}
+
+function toggleVibration(){
+
+vibration=!vibration
+
+alert("Vibration "+(vibration?"ON":"OFF"))
+
+}
+
+function calibrate(){
+
+if(characteristic){
+
+let encoder=new TextEncoder()
+
+characteristic.writeValue(encoder.encode("CAL"))
 
 }
 
@@ -171,11 +258,47 @@ function sendThreshold(){
 
 if(characteristic){
 
-let encoder = new TextEncoder();
+let encoder=new TextEncoder()
 
-characteristic.writeValue(encoder.encode(threshold));
+characteristic.writeValue(encoder.encode(threshold))
 
 }
+
+}
+
+const ctx=document.getElementById('graph')
+
+const chart=new Chart(ctx,{
+type:'line',
+data:{
+labels:[],
+datasets:[{
+label:'Deviation',
+data:[],
+borderColor:'blue',
+fill:false
+}]
+},
+options:{
+animation:false
+}
+})
+
+function updateGraph(value){
+
+let t=chart.data.labels.length
+
+chart.data.labels.push(t)
+chart.data.datasets[0].data.push(value)
+
+if(chart.data.labels.length>40){
+
+chart.data.labels.shift()
+chart.data.datasets[0].data.shift()
+
+}
+
+chart.update()
 
 }
 
