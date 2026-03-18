@@ -24,12 +24,10 @@ width:360px;
 border-radius:12px;
 }
 
-.value{
-font-size:26px;
-}
-
 .good{color:#22c55e;}
 .bad{color:#ef4444;}
+
+.slider{width:80%;}
 
 button{
 padding:10px 18px;
@@ -38,10 +36,7 @@ border-radius:8px;
 background:#3b82f6;
 color:white;
 cursor:pointer;
-margin:5px;
 }
-
-.slider{width:80%;}
 
 canvas{
 background:white;
@@ -49,11 +44,12 @@ border-radius:10px;
 }
 
 </style>
+
 </head>
 
 <body>
 
-<h1>POSTURA_V3</h1>
+<h1>POSTURA_V3 Dashboard</h1>
 
 <div class="card">
 <h3>Device</h3>
@@ -79,34 +75,24 @@ class="slider" id="thresholdSlider">
 </div>
 
 <div class="card">
-<h3>Session</h3>
+<h3>Session Timer</h3>
+<span id="timer">0</span> sec
+</div>
 
-Timer: <span id="timer">0</span> sec<br>
+<div class="card">
+<h3>Posture Statistics</h3>
 Good Time: <span id="goodTime">0</span> sec<br>
 Bad Time: <span id="badTime">0</span> sec
-
 </div>
 
 <div class="card">
-<h3>Daily Score</h3>
-
+<h3>Daily Posture Score</h3>
 Score: <span id="score">0</span>/100
-
 </div>
 
 <div class="card">
-<h3>Alerts</h3>
-
-Total Alerts: <span id="alerts">0</span>
-
-</div>
-
-<div class="card">
-<h3>Controls</h3>
-
-<button onclick="toggleVibration()">Toggle Vibration</button>
-<button onclick="calibrate()">Calibrate</button>
-
+<h3>Alert Counter</h3>
+Bad Posture Alerts: <span id="alerts">0</span>
 </div>
 
 <div class="card">
@@ -117,12 +103,11 @@ Total Alerts: <span id="alerts">0</span>
 <script>
 
 let characteristic
-let threshold=15
-let vibration=true
+let threshold = 15
 
-let goodTime=0
-let badTime=0
-let alerts=0
+let goodTime = 0
+let badTime = 0
+let alerts = 0
 let startTime
 
 const slider=document.getElementById("thresholdSlider")
@@ -137,21 +122,19 @@ sendThreshold()
 
 async function connectDevice(){
 
-try{
-
-const device=await navigator.bluetooth.requestDevice({
+const device = await navigator.bluetooth.requestDevice({
 filters:[{name:'POSTURA_V3'}],
 optionalServices:['12345678-1234-1234-1234-1234567890ab']
 })
 
-document.getElementById("status").innerText="Connecting"
+document.getElementById("status").innerText="Connecting..."
 
-const server=await device.gatt.connect()
+const server = await device.gatt.connect()
 
-const service=await server.getPrimaryService(
+const service = await server.getPrimaryService(
 '12345678-1234-1234-1234-1234567890ab')
 
-characteristic=await service.getCharacteristic(
+characteristic = await service.getCharacteristic(
 'abcd1234-5678-1234-5678-abcdef123456')
 
 await characteristic.startNotifications()
@@ -163,13 +146,6 @@ handleData)
 document.getElementById("status").innerText="Connected"
 
 startTimer()
-
-}
-catch(e){
-
-document.getElementById("status").innerText="Connection Failed"
-
-}
 
 }
 
@@ -187,13 +163,13 @@ document.getElementById("deviation").innerText=deviation.toFixed(2)
 
 if(deviation>threshold){
 
-document.getElementById("posture").innerHTML="<span class='bad'>BAD</span>"
+document.getElementById("posture").innerHTML="<span class='bad'>BAD POSTURE</span>"
 badTime++
 alerts++
 
 }else{
 
-document.getElementById("posture").innerHTML="<span class='good'>GOOD</span>"
+document.getElementById("posture").innerHTML="<span class='good'>GOOD POSTURE</span>"
 goodTime++
 
 }
@@ -203,7 +179,6 @@ document.getElementById("badTime").innerText=badTime
 document.getElementById("alerts").innerText=alerts
 
 calculateScore()
-
 updateGraph(deviation)
 
 }
@@ -234,26 +209,6 @@ document.getElementById("timer").innerText=sec
 
 }
 
-function toggleVibration(){
-
-vibration=!vibration
-
-alert("Vibration "+(vibration?"ON":"OFF"))
-
-}
-
-function calibrate(){
-
-if(characteristic){
-
-let encoder=new TextEncoder()
-
-characteristic.writeValue(encoder.encode("CAL"))
-
-}
-
-}
-
 function sendThreshold(){
 
 if(characteristic){
@@ -279,9 +234,7 @@ borderColor:'blue',
 fill:false
 }]
 },
-options:{
-animation:false
-}
+options:{animation:false}
 })
 
 function updateGraph(value){
