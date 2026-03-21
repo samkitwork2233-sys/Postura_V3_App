@@ -1,262 +1,182 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>POSTURA_V3 Dashboard</title>
+  <title>POSTURA V3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #0f172a;
+      color: white;
+    }
 
-<style>
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      margin: 10px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
 
-body{
-font-family:Arial;
-background:#0f172a;
-color:white;
-text-align:center;
-padding:30px;
-}
+    #status {
+      font-size: 22px;
+      margin: 15px;
+    }
 
-.card{
-background:#1e293b;
-padding:20px;
-margin:15px auto;
-width:360px;
-border-radius:12px;
-}
+    .good { color: #22c55e; }
+    .bad { color: #ef4444; }
 
-.good{color:#22c55e;}
-.bad{color:#ef4444;}
+    .card {
+      background: #1e293b;
+      margin: 10px;
+      padding: 15px;
+      border-radius: 15px;
+    }
 
-.slider{width:80%;}
-
-button{
-padding:10px 18px;
-border:none;
-border-radius:8px;
-background:#3b82f6;
-color:white;
-cursor:pointer;
-}
-
-canvas{
-background:white;
-border-radius:10px;
-}
-
-</style>
-
+    input[type=range] {
+      width: 80%;
+    }
+  </style>
 </head>
 
 <body>
 
-<h1>POSTURA_V3 Dashboard</h1>
+<h1>POSTURA V3</h1>
+
+<button onclick="connect()">Connect Device</button>
+
+<div id="status">Disconnected</div>
 
 <div class="card">
-<button onclick="connectDevice()">Connect Device</button>
-<p>Status: <span id="status">Disconnected</span></p>
+  <h3>Angle</h3>
+  <p id="angle">--</p>
 </div>
 
 <div class="card">
-Angle: <span id="angle">0</span>°<br>
-Deviation: <span id="deviation">0</span>°<br>
-Status: <span id="posture">Waiting...</span>
+  <h3>Deviation</h3>
+  <p id="deviation">--</p>
 </div>
 
 <div class="card">
-
-<input type="range" min="5" max="30" value="15"
-class="slider" id="thresholdSlider">
-
-<p>Threshold: <span id="thresholdValue">15</span>°</p>
-
+  <h3>Posture</h3>
+  <p id="posture">--</p>
 </div>
 
 <div class="card">
-Session Time: <span id="timer">0</span> sec
+  <h3>Threshold</h3>
+  <input type="range" min="5" max="30" value="10" id="slider">
+  <p id="thValue">10</p>
 </div>
 
 <div class="card">
-Good Time: <span id="goodTime">0</span> sec<br>
-Bad Time: <span id="badTime">0</span> sec
+  <h3>Session Time</h3>
+  <p id="timer">0 sec</p>
 </div>
 
 <div class="card">
-Posture Score: <span id="score">0</span>/100
+  <h3>Slouch Count</h3>
+  <p id="slouch">0</p>
 </div>
 
-<div class="card">
-Slouch Count: <span id="alerts">0</span>
-</div>
-
-<div class="card">
-<canvas id="graph"></canvas>
-</div>
+<canvas id="graph" width="300" height="150"></canvas>
 
 <script>
+let characteristic;
+let threshold = 10;
+let slouchCount = 0;
+let lastBad = false;
+let startTime = Date.now();
 
-let characteristic
-let threshold = 15
+const SERVICE_UUID = "12345678-1234-1234-1234-1234567890ab";
+const CHAR_UUID = "abcd1234-5678-1234-5678-abcdef123456";
 
-let goodTime = 0
-let badTime = 0
-let alerts = 0
+async function connect() {
+  const device = await navigator.bluetooth.requestDevice({
+    filters: [{ name: "POSTURA_V3" }],
+    optionalServices: [SERVICE_UUID]
+  });
 
-let isSlouching = false
+  const server = await device.gatt.connect();
+  const service = await server.getPrimaryService(SERVICE_UUID);
+  characteristic = await service.getCharacteristic(CHAR_UUID);
 
-let startTime
+  characteristic.startNotifications();
+  characteristic.addEventListener("characteristicvaluechanged", handleData);
 
-const slider=document.getElementById("thresholdSlider")
-
-slider.oninput=function(){
-
-threshold=this.value
-document.getElementById("thresholdValue").innerText=threshold
-sendThreshold()
-
+  document.getElementById("status").innerText = "Connected";
 }
 
-async function connectDevice(){
+function handleData(event) {
+  let value = new TextDecoder().decode(event.target.value);
+  let [angle, deviation] = value.split(",");
 
-const device = await navigator.bluetooth.requestDevice({
-filters:[{name:'POSTURA_V3'}],
-optionalServices:['12345678-1234-1234-1234-1234567890ab']
-})
+  angle = parseFloat(angle);
+  deviation = parseFloat(deviation);
 
-document.getElementById("status").innerText="Connecting..."
+  document.getElementById("angle").innerText = angle.toFixed(2);
+  document.getElementById("deviation").innerText = deviation.toFixed(2);
 
-const server = await device.gatt.connect()
+  // posture detection
+  if (deviation > threshold) {
+    document.getElementById("posture").innerText = "Bad";
+    document.getElementById("posture").className = "bad";
 
-const service = await server.getPrimaryService(
-'12345678-1234-1234-1234-1234567890ab')
+    if (!lastBad) {
+      slouchCount++;
+    }
+    lastBad = true;
 
-characteristic = await service.getCharacteristic(
-'abcd1234-5678-1234-5678-abcdef123456')
+  } else {
+    document.getElementById("posture").innerText = "Good";
+    document.getElementById("posture").className = "good";
+    lastBad = false;
+  }
 
-await characteristic.startNotifications()
+  document.getElementById("slouch").innerText = slouchCount;
 
-characteristic.addEventListener(
-'characteristicvaluechanged',
-handleData)
-
-document.getElementById("status").innerText="Connected"
-
-startTimer()
-
+  updateGraph(deviation);
 }
 
-function handleData(event){
+// slider
+document.getElementById("slider").addEventListener("input", function() {
+  threshold = this.value;
+  document.getElementById("thValue").innerText = threshold;
 
-let value=new TextDecoder().decode(event.target.value)
+  if (characteristic) {
+    let encoder = new TextEncoder();
+    characteristic.writeValue(encoder.encode(threshold.toString()));
+  }
+});
 
-let data=value.split(",")
+// timer
+setInterval(() => {
+  let time = Math.floor((Date.now() - startTime) / 1000);
+  document.getElementById("timer").innerText = time + " sec";
+}, 1000);
 
-let angle=parseFloat(data[0])
-let deviation=parseFloat(data[1])
+// graph
+let canvas = document.getElementById("graph");
+let ctx = canvas.getContext("2d");
+let dataPoints = [];
 
-document.getElementById("angle").innerText=angle.toFixed(2)
-document.getElementById("deviation").innerText=deviation.toFixed(2)
+function updateGraph(val) {
+  if (dataPoints.length > 50) dataPoints.shift();
+  dataPoints.push(val);
 
-if(deviation > threshold){
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-document.getElementById("posture").innerHTML="<span class='bad'>BAD POSTURE</span>"
-
-badTime++
-
-if(!isSlouching){
-alerts++
-isSlouching = true
+  ctx.beginPath();
+  dataPoints.forEach((v, i) => {
+    let x = i * 6;
+    let y = 150 - v * 4;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
 }
-
-}else{
-
-document.getElementById("posture").innerHTML="<span class='good'>GOOD POSTURE</span>"
-
-goodTime++
-isSlouching = false
-
-}
-
-document.getElementById("goodTime").innerText=goodTime
-document.getElementById("badTime").innerText=badTime
-document.getElementById("alerts").innerText=alerts
-
-calculateScore()
-updateGraph(deviation)
-
-}
-
-function calculateScore(){
-
-let total=goodTime+badTime
-
-if(total==0)return
-
-let score=Math.round((goodTime/total)*100)
-
-document.getElementById("score").innerText=score
-
-}
-
-function startTimer(){
-
-startTime=Date.now()
-
-setInterval(function(){
-
-let sec=Math.floor((Date.now()-startTime)/1000)
-
-document.getElementById("timer").innerText=sec
-
-},1000)
-
-}
-
-function sendThreshold(){
-
-if(characteristic){
-
-let encoder=new TextEncoder()
-
-characteristic.writeValue(encoder.encode(threshold))
-
-}
-
-}
-
-const ctx=document.getElementById('graph')
-
-const chart=new Chart(ctx,{
-type:'line',
-data:{
-labels:[],
-datasets:[{
-label:'Deviation',
-data:[],
-borderColor:'blue',
-fill:false
-}]
-},
-options:{animation:false}
-})
-
-function updateGraph(value){
-
-let t=chart.data.labels.length
-
-chart.data.labels.push(t)
-chart.data.datasets[0].data.push(value)
-
-if(chart.data.labels.length>40){
-
-chart.data.labels.shift()
-chart.data.datasets[0].data.shift()
-
-}
-
-chart.update()
-
-}
-
 </script>
 
 </body>
