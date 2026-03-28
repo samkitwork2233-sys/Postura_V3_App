@@ -1,3 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>POSTURA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+    }
+
+    h1 { margin-top: 20px; }
+
+    button {
+      padding: 12px 25px;
+      font-size: 16px;
+      background: #22c55e;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .card {
+      background: #1e293b;
+      margin: 20px auto;
+      padding: 20px;
+      width: 80%;
+      border-radius: 15px;
+    }
+
+    .good { color: #22c55e; }
+    .bad { color: #ef4444; }
+  </style>
+</head>
+
+<body>
+
+<h1>POSTURA</h1>
+
+<button onclick="connect()">Connect Device</button>
+
+<div class="card">
+  <h2>Status: <span id="status">--</span></h2>
+  <h3>Angle: <span id="angle">--</span></h3>
+  <h3>Deviation: <span id="dev">--</span></h3>
+  <h3>Score: <span id="score">--</span></h3>
+  <h3>Slouch Count: <span id="count">--</span></h3>
+</div>
+
 <script>
 let characteristic;
 
@@ -5,20 +57,17 @@ async function connect() {
   try {
 
     const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,   // 🔥 IMPORTANT FIX
+      acceptAllDevices: true,
       optionalServices: ["12345678-1234-1234-1234-1234567890ab"]
     });
 
-    console.log("Selected:", device.name);
-
     const server = await device.gatt.connect();
-    console.log("GATT connected");
 
     const service = await server.getPrimaryService(
       "12345678-1234-1234-1234-1234567890ab"
     );
 
-    const characteristic = await service.getCharacteristic(
+    characteristic = await service.getCharacteristic(
       "abcd1234-5678-1234-5678-abcdef123456"
     );
 
@@ -29,11 +78,38 @@ async function connect() {
       handleData
     );
 
-    alert("Connected to " + device.name + " 🚀");
+    alert("Connected to POSTURA 🚀");
 
   } catch (error) {
     console.error(error);
     alert("Connection Failed ❌");
   }
 }
+
+function handleData(event) {
+
+  let value = new TextDecoder().decode(event.target.value).trim();
+  let parts = value.split(",");
+
+  if (parts.length < 5) return;
+
+  let angle = parts[0];
+  let dev = parts[1];
+  let status = parts[2];
+  let score = parts[3];
+  let count = parts[4];
+
+  document.getElementById("angle").innerText = angle;
+  document.getElementById("dev").innerText = dev;
+  document.getElementById("score").innerText = score;
+  document.getElementById("count").innerText = count;
+
+  let statusEl = document.getElementById("status");
+  statusEl.innerText = status;
+
+  statusEl.className = (status === "GOOD") ? "good" : "bad";
+}
 </script>
+
+</body>
+</html>
