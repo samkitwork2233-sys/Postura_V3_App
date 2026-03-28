@@ -35,6 +35,7 @@
 
     .good { color: #22c55e; }
     .bad { color: #ef4444; }
+    .neutral { color: #facc15; }
   </style>
 </head>
 
@@ -63,15 +64,22 @@ async function connect() {
       optionalServices: ["12345678-1234-1234-1234-1234567890ab"]
     });
 
+    console.log("Device selected:", device.name);
+
     const server = await device.gatt.connect();
+    console.log("Connected to GATT");
 
     const service = await server.getPrimaryService(
       "12345678-1234-1234-1234-1234567890ab"
     );
 
+    console.log("Service obtained");
+
     characteristic = await service.getCharacteristic(
       "abcd1234-5678-1234-5678-abcdef123456"
     );
+
+    console.log("Characteristic obtained");
 
     await characteristic.startNotifications();
 
@@ -83,16 +91,20 @@ async function connect() {
     alert("Connected to POSTURA 🚀");
 
   } catch (error) {
-    console.log(error);
+    console.error(error);
     alert("Connection Failed ❌");
   }
 }
 
 function handleData(event) {
 
-  let value = new TextDecoder().decode(event.target.value);
+  let value = new TextDecoder().decode(event.target.value).trim();
+
+  console.log("RAW:", value);
 
   let parts = value.split(",");
+
+  if (parts.length < 5) return;
 
   let angle = parts[0];
   let dev = parts[1];
@@ -108,10 +120,14 @@ function handleData(event) {
   let statusEl = document.getElementById("status");
   statusEl.innerText = status;
 
+  statusEl.classList.remove("good", "bad", "neutral");
+
   if (status === "GOOD") {
-    statusEl.className = "good";
+    statusEl.classList.add("good");
+  } else if (status === "BAD") {
+    statusEl.classList.add("bad");
   } else {
-    statusEl.className = "bad";
+    statusEl.classList.add("neutral");
   }
 }
 </script>
