@@ -1,181 +1,118 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>POSTURA V3</title>
+  <title>POSTURA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body {
       font-family: Arial;
-      text-align: center;
       background: #0f172a;
       color: white;
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 20px;
     }
 
     button {
-      padding: 12px 20px;
+      padding: 12px 25px;
       font-size: 16px;
-      margin: 10px;
-      border-radius: 10px;
+      background: #22c55e;
       border: none;
+      border-radius: 10px;
       cursor: pointer;
     }
 
-    #status {
-      font-size: 22px;
-      margin: 15px;
+    .card {
+      background: #1e293b;
+      margin: 20px auto;
+      padding: 20px;
+      width: 80%;
+      border-radius: 15px;
     }
 
     .good { color: #22c55e; }
     .bad { color: #ef4444; }
-
-    .card {
-      background: #1e293b;
-      margin: 10px;
-      padding: 15px;
-      border-radius: 15px;
-    }
-
-    input[type=range] {
-      width: 80%;
-    }
   </style>
 </head>
 
 <body>
 
-<h1>POSTURA V3</h1>
+<h1>POSTURA</h1>
 
 <button onclick="connect()">Connect Device</button>
 
-<div id="status">Disconnected</div>
-
 <div class="card">
-  <h3>Angle</h3>
-  <p id="angle">--</p>
+  <h2>Status: <span id="status">--</span></h2>
+  <h3>Angle: <span id="angle">--</span></h3>
+  <h3>Deviation: <span id="dev">--</span></h3>
+  <h3>Score: <span id="score">--</span></h3>
+  <h3>Slouch Count: <span id="count">--</span></h3>
 </div>
-
-<div class="card">
-  <h3>Deviation</h3>
-  <p id="deviation">--</p>
-</div>
-
-<div class="card">
-  <h3>Posture</h3>
-  <p id="posture">--</p>
-</div>
-
-<div class="card">
-  <h3>Threshold</h3>
-  <input type="range" min="5" max="30" value="10" id="slider">
-  <p id="thValue">10</p>
-</div>
-
-<div class="card">
-  <h3>Session Time</h3>
-  <p id="timer">0 sec</p>
-</div>
-
-<div class="card">
-  <h3>Slouch Count</h3>
-  <p id="slouch">0</p>
-</div>
-
-<canvas id="graph" width="300" height="150"></canvas>
 
 <script>
 let characteristic;
-let threshold = 10;
-let slouchCount = 0;
-let lastBad = false;
-let startTime = Date.now();
-
-const SERVICE_UUID = "12345678-1234-1234-1234-1234567890ab";
-const CHAR_UUID = "abcd1234-5678-1234-5678-abcdef123456";
 
 async function connect() {
-  const device = await navigator.bluetooth.requestDevice({
-    filters: [{ name: "POSTURA_V3" }],
-    optionalServices: [SERVICE_UUID]
-  });
+  try {
 
-  const server = await device.gatt.connect();
-  const service = await server.getPrimaryService(SERVICE_UUID);
-  characteristic = await service.getCharacteristic(CHAR_UUID);
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: "POSTURA_V3" }],
+      optionalServices: ["12345678-1234-1234-1234-1234567890ab"]
+    });
 
-  characteristic.startNotifications();
-  characteristic.addEventListener("characteristicvaluechanged", handleData);
+    const server = await device.gatt.connect();
 
-  document.getElementById("status").innerText = "Connected";
+    const service = await server.getPrimaryService(
+      "12345678-1234-1234-1234-1234567890ab"
+    );
+
+    characteristic = await service.getCharacteristic(
+      "abcd1234-5678-1234-5678-abcdef123456"
+    );
+
+    await characteristic.startNotifications();
+
+    characteristic.addEventListener(
+      "characteristicvaluechanged",
+      handleData
+    );
+
+    alert("Connected to POSTURA 🚀");
+
+  } catch (error) {
+    console.log(error);
+    alert("Connection Failed ❌");
+  }
 }
 
 function handleData(event) {
+
   let value = new TextDecoder().decode(event.target.value);
-  let [angle, deviation] = value.split(",");
 
-  angle = parseFloat(angle);
-  deviation = parseFloat(deviation);
+  let parts = value.split(",");
 
-  document.getElementById("angle").innerText = angle.toFixed(2);
-  document.getElementById("deviation").innerText = deviation.toFixed(2);
+  let angle = parts[0];
+  let dev = parts[1];
+  let status = parts[2];
+  let score = parts[3];
+  let count = parts[4];
 
-  // posture detection
-  if (deviation > threshold) {
-    document.getElementById("posture").innerText = "Bad";
-    document.getElementById("posture").className = "bad";
+  document.getElementById("angle").innerText = angle;
+  document.getElementById("dev").innerText = dev;
+  document.getElementById("score").innerText = score;
+  document.getElementById("count").innerText = count;
 
-    if (!lastBad) {
-      slouchCount++;
-    }
-    lastBad = true;
+  let statusEl = document.getElementById("status");
+  statusEl.innerText = status;
 
+  if (status === "GOOD") {
+    statusEl.className = "good";
   } else {
-    document.getElementById("posture").innerText = "Good";
-    document.getElementById("posture").className = "good";
-    lastBad = false;
+    statusEl.className = "bad";
   }
-
-  document.getElementById("slouch").innerText = slouchCount;
-
-  updateGraph(deviation);
-}
-
-// slider
-document.getElementById("slider").addEventListener("input", function() {
-  threshold = this.value;
-  document.getElementById("thValue").innerText = threshold;
-
-  if (characteristic) {
-    let encoder = new TextEncoder();
-    characteristic.writeValue(encoder.encode(threshold.toString()));
-  }
-});
-
-// timer
-setInterval(() => {
-  let time = Math.floor((Date.now() - startTime) / 1000);
-  document.getElementById("timer").innerText = time + " sec";
-}, 1000);
-
-// graph
-let canvas = document.getElementById("graph");
-let ctx = canvas.getContext("2d");
-let dataPoints = [];
-
-function updateGraph(val) {
-  if (dataPoints.length > 50) dataPoints.shift();
-  dataPoints.push(val);
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.beginPath();
-  dataPoints.forEach((v, i) => {
-    let x = i * 6;
-    let y = 150 - v * 4;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
 }
 </script>
 
